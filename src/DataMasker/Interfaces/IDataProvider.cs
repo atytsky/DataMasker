@@ -2,14 +2,14 @@
 using Bogus.DataSets;
 using DataMasker.Models;
 
-namespace DataMasker.Interfaces
+namespace DataMasker.Interfaces;
+
+public interface IDataProvider
 {
-  public interface IDataProvider
-  {
     bool CanProvide(DataType dataType);
+
     object GetValue(
         ColumnConfig columnConfig,
         IDictionary<string, object> obj,
         Name.Gender? gender);
-  }
 }

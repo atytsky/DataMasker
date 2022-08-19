@@ -1,8 +1,7 @@
-﻿namespace DataMasker.Models
+﻿namespace DataMasker.Models;
+
+public enum DataSourceType
 {
-    public enum DataSourceType
-    {
-        InMemoryFake,
-        SqlServer
-    }
+    InMemoryFake,
+    SqlServer
 }

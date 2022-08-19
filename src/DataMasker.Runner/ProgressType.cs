@@ -1,11 +1,10 @@
-﻿namespace DataMasker.Runner
+﻿namespace DataMasker.Runner;
+
+public enum ProgressType
 {
-    public enum ProgressType
-    {
-        Masking,
+    Masking,
 
-        Updating,
+    Updating,
 
-        Overall
-    }
+    Overall
 }

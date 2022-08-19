@@ -7,39 +7,42 @@ using Bogus.DataSets;
 using DataMasker.Interfaces;
 using DataMasker.Models;
 
-namespace DataMasker
+namespace DataMasker;
+
+/// <summary>
+///     DataMasker
+/// </summary>
+/// <seealso cref="DataMasker.Interfaces.IDataMasker" />
+public class DataMasker : IDataMasker
 {
-  /// <summary>
-  /// DataMasker
-  /// </summary>
-  /// <seealso cref="DataMasker.Interfaces.IDataMasker"/>
-  public class DataMasker : IDataMasker
-  {
     /// <summary>
-    /// The maximum iterations allowed when attempting to retrieve a unique value per column
+    ///     The maximum iterations allowed when attempting to retrieve a unique value per column
     /// </summary>
     private const int MAX_UNIQUE_VALUE_ITERATIONS = 5000;
+
     /// <summary>
-    /// A set of available data providers
+    ///     A set of available data providers
     /// </summary>
     private readonly IEnumerable<IDataProvider> _dataProviders;
 
     /// <summary>
-    /// A dictionary key'd by {tableName}.{columnName} containing a <see cref="HashSet{T}"/> of values which have been previously used for this table/column
+    ///     A dictionary key'd by {tableName}.{columnName} containing a <see cref="HashSet{T}" /> of values which have been
+    ///     previously used for this table/column
     /// </summary>
-    private readonly ConcurrentDictionary<string, HashSet<object>> _uniqueValues = new ConcurrentDictionary<string, HashSet<object>>();
+    private readonly ConcurrentDictionary<string, HashSet<object>> _uniqueValues = new();
+
     /// <summary>
-    /// Initializes a new instance of the <see cref="DataMasker"/> class.
+    ///     Initializes a new instance of the <see cref="DataMasker" /> class.
     /// </summary>
     /// <param name="dataProviders">A set of data proiders.</param>
     public DataMasker(
         IEnumerable<IDataProvider> dataProviders)
     {
-      _dataProviders = dataProviders;
+        _dataProviders = dataProviders;
     }
 
     /// <summary>
-    /// Masks the specified object with new data
+    ///     Masks the specified object with new data
     /// </summary>
     /// <param name="obj">The object to mask</param>
     /// <param name="tableConfig">The table configuration.</param>
@@ -48,84 +51,84 @@ namespace DataMasker
         IDictionary<string, object> obj,
         TableConfig tableConfig)
     {
-      obj = MaskNormal(obj, tableConfig, tableConfig.Columns.Where(x => !x.Ignore && x.Type != DataType.Computed && x.Type != DataType.Sql));
-      obj = MaskComputed(obj, tableConfig, tableConfig.Columns.Where(x => !x.Ignore && x.Type == DataType.Computed && x.Type != DataType.Sql));
-      obj = MaskSql(obj, tableConfig, tableConfig.Columns.Where(x => !x.Ignore && x.Type == DataType.Sql));
-      return obj;
+        obj = MaskNormal(obj, tableConfig,
+            tableConfig.Columns.Where(x => !x.Ignore && x.Type != DataType.Computed && x.Type != DataType.Sql));
+        obj = MaskComputed(obj, tableConfig,
+            tableConfig.Columns.Where(x => !x.Ignore && x.Type == DataType.Computed && x.Type != DataType.Sql));
+        obj = MaskSql(obj, tableConfig, tableConfig.Columns.Where(x => !x.Ignore && x.Type == DataType.Sql));
+        return obj;
     }
+
     private IDictionary<string, object> MaskNormal(
-              IDictionary<string, object> obj,
-              TableConfig tableConfig, IEnumerable<ColumnConfig> columnConfigs)
+        IDictionary<string, object> obj,
+        TableConfig tableConfig, IEnumerable<ColumnConfig> columnConfigs)
     {
-
-      foreach (ColumnConfig columnConfig in columnConfigs)
-      {
-        object existingValue = obj[columnConfig.Name];
-
-        Name.Gender? gender = null;
-        if (!string.IsNullOrEmpty(columnConfig.UseGenderColumn))
+        foreach (var columnConfig in columnConfigs)
         {
-          object g = obj[columnConfig.UseGenderColumn];
-          gender = Utils.Utils.TryParseGender(g?.ToString());
+            var existingValue = obj[columnConfig.Name];
+
+            Name.Gender? gender = null;
+            if (!string.IsNullOrEmpty(columnConfig.UseGenderColumn))
+            {
+                var g = obj[columnConfig.UseGenderColumn];
+                gender = Utils.Utils.TryParseGender(g?.ToString());
+            }
+
+            if (columnConfig.Unique)
+            {
+                existingValue = GetUniqueValue(tableConfig.Name, columnConfig, obj, gender);
+            }
+            else
+            {
+                var dataProvider = GetDataProvider(columnConfig.Type);
+                existingValue = dataProvider.GetValue(columnConfig, obj, gender);
+            }
+
+            //replace the original value
+            obj[columnConfig.Name] = existingValue;
         }
 
-        if (columnConfig.Unique)
-        {
-          existingValue = GetUniqueValue(tableConfig.Name, columnConfig, obj, gender);
-        }
-        else
-        {
-          IDataProvider dataProvider = this.GetDataProvider(columnConfig.Type);
-          existingValue = dataProvider.GetValue(columnConfig, obj, gender);
-        }
-        //replace the original value
-        obj[columnConfig.Name] = existingValue;
-      }
-      return obj;
+        return obj;
     }
 
     private IDictionary<string, object> MaskComputed(
-              IDictionary<string, object> obj,
-              TableConfig tableConfig, IEnumerable<ColumnConfig> columnConfigs)
+        IDictionary<string, object> obj,
+        TableConfig tableConfig, IEnumerable<ColumnConfig> columnConfigs)
     {
-      foreach (ColumnConfig columnConfig in columnConfigs)
-      {
-        var separator = columnConfig.Separator ?? " ";
-        StringBuilder colValue = new StringBuilder();
-        bool first = true;
-        foreach (var sourceColumn in columnConfig.SourceColumns)
+        foreach (var columnConfig in columnConfigs)
         {
-          if (!obj.ContainsKey(sourceColumn))
-          {
-            throw new Exception($"Source column {sourceColumn} could not be found.");
-          }
+            var separator = columnConfig.Separator ?? " ";
+            var colValue = new StringBuilder();
+            var first = true;
+            foreach (var sourceColumn in columnConfig.SourceColumns)
+            {
+                if (!obj.ContainsKey(sourceColumn))
+                    throw new Exception($"Source column {sourceColumn} could not be found.");
 
-          if (first)
-          {
-            first = false;
-          }
-          else
-          {
-            colValue.Append(separator);
-          }
-          colValue.Append(obj[sourceColumn] ?? String.Empty);
+                if (first)
+                    first = false;
+                else
+                    colValue.Append(separator);
+                colValue.Append(obj[sourceColumn] ?? string.Empty);
+            }
+
+            obj[columnConfig.Name] = colValue.ToString();
         }
-        obj[columnConfig.Name] = colValue.ToString();
-      }
-      return obj;
+
+        return obj;
     }
 
     private IDictionary<string, object> MaskSql(
-              IDictionary<string, object> obj,
-              TableConfig tableConfig, IEnumerable<ColumnConfig> columnConfigs)
+        IDictionary<string, object> obj,
+        TableConfig tableConfig, IEnumerable<ColumnConfig> columnConfigs)
     {
+        foreach (var columnConfig in columnConfigs)
+        {
+            var dataProvider = GetDataProvider(DataType.Sql);
+            obj[columnConfig.Name] = dataProvider.GetValue(columnConfig, obj, null);
+        }
 
-      foreach (var columnConfig in columnConfigs)
-      {
-        IDataProvider dataProvider = this.GetDataProvider(DataType.Sql);
-        obj[columnConfig.Name] = dataProvider.GetValue(columnConfig, obj, null);
-      }
-      return obj;
+        return obj;
     }
 
 
@@ -134,40 +137,38 @@ namespace DataMasker
         IDictionary<string, object> obj,
         Name.Gender? gender)
     {
-      object existingValue = obj[columnConfig.Name];
-      //create a unique key
-      string uniqueCacheKey = $"{tableName}.{columnConfig.Name}";
+        var existingValue = obj[columnConfig.Name];
+        //create a unique key
+        var uniqueCacheKey = $"{tableName}.{columnConfig.Name}";
 
-      //if this table/column combination hasn't been seen before add an empty hash set
-      if (!_uniqueValues.ContainsKey(uniqueCacheKey))
-      {
-        _uniqueValues.AddOrUpdate(uniqueCacheKey, new HashSet<object>(), (a, b) => b);
-      }
-      //grab the hash set for this table/column 
-      HashSet<object> uniqueValues = _uniqueValues[uniqueCacheKey];
+        //if this table/column combination hasn't been seen before add an empty hash set
+        if (!_uniqueValues.ContainsKey(uniqueCacheKey))
+            _uniqueValues.AddOrUpdate(uniqueCacheKey, new HashSet<object>(), (a, b) => b);
+        //grab the hash set for this table/column 
+        var uniqueValues = _uniqueValues[uniqueCacheKey];
 
-      int totalIterations = 0;
-      do
-      {
-        IDataProvider dataProvider = this.GetDataProvider(columnConfig.Type);
-        existingValue = dataProvider.GetValue(columnConfig, obj, gender);
-        totalIterations++;
-        if (totalIterations >= MAX_UNIQUE_VALUE_ITERATIONS)
+        var totalIterations = 0;
+        do
         {
-          throw new Exception($"Unable to generate unique value for {uniqueCacheKey}, attempt to resolve value {totalIterations} times");
-        }
-      }
-      while (uniqueValues.Contains(existingValue));
+            var dataProvider = GetDataProvider(columnConfig.Type);
+            existingValue = dataProvider.GetValue(columnConfig, obj, gender);
 
-      uniqueValues.Add(existingValue);
-      return existingValue;
+            if (columnConfig.Type == DataType.StringFormat && columnConfig.RetainEmptyStringValues &&
+                string.IsNullOrEmpty(existingValue as string)) return existingValue;
+
+            totalIterations++;
+            if (totalIterations >= MAX_UNIQUE_VALUE_ITERATIONS)
+                throw new Exception(
+                    $"Unable to generate unique value for {uniqueCacheKey}, attempt to resolve value {totalIterations} times");
+        } while (uniqueValues.Contains(existingValue));
+
+        uniqueValues.Add(existingValue);
+        return existingValue;
     }
 
 
     private IDataProvider GetDataProvider(DataType dataType)
     {
-      return this._dataProviders.First(x => x.CanProvide(dataType));
+        return _dataProviders.First(x => x.CanProvide(dataType));
     }
-
-  }
 }

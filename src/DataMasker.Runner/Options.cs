@@ -1,13 +1,14 @@
 ﻿using CommandLine;
 
-namespace DataMasker.Runner
+namespace DataMasker.Runner;
+
+public class Options
 {
-  public class Options
-  {
     [Option('c', "config-file", Required = true, HelpText = "the json configuration to be")]
     public string ConfigFile { get; set; }
 
-    [Option('d', "dry-run", Default = false, Required = false, HelpText = "dry run, only supported by some data sources")]
+    [Option('d', "dry-run", Default = false, Required = false,
+        HelpText = "dry run, only supported by some data sources")]
     public bool? DryRun { get; set; }
 
     [Option('l', "locale", Default = null, HelpText = "set the locale")]
@@ -17,10 +18,10 @@ namespace DataMasker.Runner
     public int? UpdateBatchSize { get; set; }
 
 
-    [Option("print-options", Default = false, HelpText = "prints the arguments passed into this tool in a json format without executing anything else")]
+    [Option("print-options", Default = false,
+        HelpText = "prints the arguments passed into this tool in a json format without executing anything else")]
     public bool PrintOptions { get; set; }
 
     [Option("no-output", Default = false, HelpText = "if set, no output to the console will be written")]
     public bool NoOutput { get; set; }
-  }
 }

@@ -1,10 +1,10 @@
 ﻿using Konsole;
 
-namespace DataMasker.Runner {
-    public class ProgressbarUpdate
-    {
-        public ProgressBar ProgressBar { get; set; }
+namespace DataMasker.Runner;
 
-        public string LastMessage { get; set; }
-    }
+public class ProgressbarUpdate
+{
+    public ProgressBar ProgressBar { get; set; }
+
+    public string LastMessage { get; set; }
 }

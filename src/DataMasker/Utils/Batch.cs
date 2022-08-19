@@ -1,71 +1,69 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
-namespace DataMasker.Utils
+namespace DataMasker.Utils;
+
+/// <summary>
+/// </summary>
+/// <typeparam name="T"></typeparam>
+public class Batch<T>
 {
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <typeparam name="T"></typeparam>
-    public class Batch<T>
+    private Batch(
+        int batchNo)
     {
-        public int BatchNo { get; }
+        BatchNo = batchNo;
+        Items = new List<T>();
+    }
 
-        public IList<T> Items { get; }
+    public int BatchNo { get; }
 
-        private Batch(
-            int batchNo)
+    public IList<T> Items { get; }
+
+    /// <summary>
+    ///     Adds the item.
+    /// </summary>
+    /// <param name="item">The item.</param>
+    public void AddItem(
+        T item)
+    {
+        Items.Add(item);
+    }
+
+
+    /// <summary>
+    ///     This method with batch an array of items base on a predicate
+    /// </summary>
+    /// <param name="items">The starting array of objects to batch</param>
+    /// <param name="addToCurrentBatchPredicate">
+    ///     A callback function which will determine if the curren item should be put on the current batch or next?
+    ///     The call back will receive the current item and the items in the current batch, the predicate should return true if
+    ///     the
+    ///     current item should be added to the current batch
+    /// </param>
+    /// <returns></returns>
+    public static IEnumerable<Batch<T>> BatchItems(
+        IEnumerable<T> items,
+        Func<T, IEnumerable<T>, bool> addToCurrentBatchPredicate)
+    {
+        var currentBatchNo = 1;
+        var currentBatch = new Batch<T>(currentBatchNo);
+
+        foreach (var item in items)
         {
-            BatchNo = batchNo;
-            Items = new List<T>();
-        }
+            var addToCurrentBatch = addToCurrentBatchPredicate(item, currentBatch.Items);
 
-        /// <summary>
-        /// Adds the item.
-        /// </summary>
-        /// <param name="item">The item.</param>
-        public void AddItem(
-            T item)
-        {
-            Items.Add(item);
-        }
-
-
-        /// <summary>
-        /// This method with batch an array of items base on a predicate
-        /// </summary>
-        /// <param name="items">The starting array of objects to batch</param>
-        /// <param name="addToCurrentBatchPredicate">
-        /// A callback function which will determine if the curren item should be put on the current batch or next?
-        /// The call back will receive the current item and the items in the current batch, the predicate should return true if the
-        /// current item should be added to the current batch
-        /// </param>
-        /// <returns></returns>
-        public static IEnumerable<Batch<T>> BatchItems(
-            IEnumerable<T> items,
-            Func<T, IEnumerable<T>, bool> addToCurrentBatchPredicate)
-        {
-            int currentBatchNo = 1;
-            Batch<T> currentBatch = new Batch<T>(currentBatchNo);
-
-            foreach (var item in items)
+            if (addToCurrentBatch)
             {
-                bool addToCurrentBatch = addToCurrentBatchPredicate(item, currentBatch.Items);
-
-                if (addToCurrentBatch)
-                {
-                    currentBatch.AddItem(item);
-                }
-                else
-                {
-                    yield return currentBatch;
-                    currentBatch = new Batch<T>(++currentBatchNo);
-                    currentBatch.AddItem(item);
-                }
+                currentBatch.AddItem(item);
             }
-
-            yield return currentBatch;
+            else
+            {
+                yield return currentBatch;
+                currentBatch = new Batch<T>(++currentBatchNo);
+                currentBatch.AddItem(item);
+            }
         }
+
+        yield return currentBatch;
     }
 }
